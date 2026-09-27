@@ -113,7 +113,20 @@ p{margin:0}
 .compare{display:grid;grid-template-columns:1fr;gap:.7rem}
 .lane{border:1px solid hsl(var(--border));border-radius:calc(var(--radius) - 2px);padding:.9rem .85rem 1rem;
   animation:blurIn .5s var(--d,0s) cubic-bezier(.22,.61,.36,1) both}
-.lane.new{background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-color:transparent}
+.lane.new{
+  background:radial-gradient(120% 140% at 100% 0%,hsl(258 45% 22%) 0%,transparent 55%),linear-gradient(160deg,hsl(245 28% 13%),hsl(240 22% 8%));
+  color:hsl(0 0% 98%);border-color:hsl(250 40% 60% / .18);
+  --primary-foreground:0 0% 98%;
+}
+@property --a{syntax:'<angle>';inherits:false;initial-value:0deg}
+@keyframes spin{to{--a:360deg}}
+@keyframes glow{0%,100%{box-shadow:0 0 14px hsl(265 90% 65% / .45)}33%{box-shadow:0 0 14px hsl(190 90% 55% / .45)}66%{box-shadow:0 0 14px hsl(320 85% 65% / .45)}}
+.lane.new .node.ship{
+  border:1.5px solid transparent;
+  background:linear-gradient(hsl(250 24% 17%),hsl(250 24% 17%)) padding-box,
+    conic-gradient(from var(--a),#8b5cf6,#22d3ee,#34d399,#f472b6,#8b5cf6) border-box;
+  animation:blurIn .45s var(--d) cubic-bezier(.22,.61,.36,1) both,spin 3s linear infinite,glow 6s ease-in-out infinite;
+}
 .lane .label{font-size:.72rem;font-weight:600;opacity:.7;margin-bottom:.6rem}
 .track{display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr;align-items:center;row-gap:0}
 .node{
@@ -396,7 +409,7 @@ button{font:inherit;cursor:pointer}
   h2.big{font-size:2.2rem}
 }
 @media (prefers-reduced-motion: reduce){
-  .enter,.exit,.pill-row{animation:none}
+  .enter,.exit,.pill-row,.lane.new .node.ship{animation:none}
   .lightbox,.lightbox.open,.lightbox img,.lightbox.open img{transition:none}
 }
 </style>
@@ -505,7 +518,7 @@ const STEPS = [
         <div class="track">
           <span class="node" style="--d:1.95s">Design</span><svg class="link" style="--d:2.2s" viewBox="0 0 28 12" preserveAspectRatio="none" aria-hidden="true"><path class="draw" pathLength="1" d="M4 6 H23"/><polyline class="head" points="19,2.5 23.5,6 19,9.5"/></svg>
           <span class="node" style="--d:2.45s">Build</span><svg class="link" style="--d:2.7s" viewBox="0 0 28 12" preserveAspectRatio="none" aria-hidden="true"><path class="draw" pathLength="1" d="M4 6 H23"/><polyline class="head" points="19,2.5 23.5,6 19,9.5"/></svg>
-          <span class="node" style="--d:2.95s">Ship</span>
+          <span class="node ship" style="--d:2.95s">Ship</span>
           <div class="loop" style="--d:3.25s"></div>
           <div class="loop-label" style="--d:3.25s"><span>and iterate, on your own</span></div>
         </div>
@@ -606,9 +619,10 @@ const STEPS = [
         </div>
         <div class="field">
           <label for="f-rel">How relevant and valuable is this for you?</label>
-          <output class="price" id="f-rel-out" for="f-rel">7<span class="of">/10</span></output>
-          <input id="f-rel" name="relevance" type="range" min="1" max="10" step="1" value="7" style="--p:66.7%" aria-describedby="rel-ends">
+          <output class="price" id="f-rel-out" for="f-rel">0<span class="of">/10</span></output>
+          <input id="f-rel" name="relevance" type="range" min="0" max="10" step="1" value="0" style="--p:0%" aria-describedby="rel-ends">
           <div class="range-ends" id="rel-ends"><span>Not for me</span><span>Exactly what I need</span></div>
+          <span class="err" id="e-rel"></span>
         </div>
         <div class="field">
           <label for="f-price">What's the right price for a full-stack design engineer course?</label>
@@ -717,7 +731,7 @@ stage.addEventListener('input',ev=>{
   }
   if(t.id==='f-rel'){
     document.getElementById('f-rel-out').innerHTML=t.value+'<span class="of">/10</span>';
-    t.style.setProperty('--p',((t.value-1)/9*100)+'%');
+    t.style.setProperty('--p',(t.value/10*100)+'%');
   }
   if(t.id==='f-price'){
     const cur=document.querySelector('input[name=currency]:checked').value;
@@ -745,7 +759,8 @@ stage.addEventListener('submit',async ev=>{
     ['name',!name,'Enter your name'],
     ['email',!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),'Enter a valid email, like you@example.com'],
     ['wa',digits.length<8||digits.length>15,'Enter your WhatsApp number with country code, like +91 98765 43210'],
-    ['price',!price||Number(price)<=0,'Enter a price']
+    ['rel',relevance<1,'Move the slider to rate it from 1 to 10'],
+    ['price',!price||Number(price)<=0||(cur==='INR'&&Number(price)<15000),cur==='INR'&&price&&Number(price)<15000?'Minimum price is ₹15,000':'Enter a price']
   ];
   let first=null;
   checks.forEach(([k,bad,msg])=>{
