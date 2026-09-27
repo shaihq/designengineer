@@ -199,6 +199,8 @@ tr.extra td{background:hsl(var(--muted) / .5)}
   border:1px solid hsl(var(--border));background:hsl(var(--muted));color:hsl(var(--foreground));
 }
 table.grouped{min-width:0;table-layout:fixed}
+.tablewrap:has(table.grouped){overflow:hidden;overflow:clip}
+.card:has(table.grouped){background:none;border:none;padding:0}
 table.grouped th:first-child{width:42%}
 table.grouped tbody{animation:blurIn .5s var(--d) cubic-bezier(.22,.61,.36,1) both}
 table.grouped tr.group td{background:hsl(var(--muted));padding:.55rem .7rem;border-bottom:1px solid hsl(var(--border))}
@@ -282,8 +284,9 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px hsl(v
 .range-ends{display:flex;justify-content:space-between;font-size:.72rem;color:hsl(var(--muted-foreground));margin-top:-.2rem}
 .submit{width:100%;margin-top:.25rem}
 .thanks{display:flex;flex-direction:column;gap:.75rem;animation:blurIn .5s cubic-bezier(.22,.61,.36,1) both}
-.card:has(.profile){padding:0;overflow:hidden}
-.profile{display:flex;flex-direction:column}
+.card:has(.profile){background:none;border:none;padding:0}
+.profile{display:flex;flex-direction:column;overflow:hidden;
+  background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:var(--radius)}
 .banner{position:relative;aspect-ratio:2.4/1;background:linear-gradient(180deg,#1f6fd1,#3fb3ea);overflow:hidden}
 .banner video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;display:block}
 .pbody{padding:0 1.25rem 1.5rem;display:flex;flex-direction:column;gap:.7rem}
@@ -301,7 +304,6 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px hsl(v
   animation:pop .35s .6s cubic-bezier(.34,1.56,.64,1) both}
 .tick-badge svg{width:14px;height:14px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 @keyframes pop{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
-.pbody .kicker{margin-top:.2rem}
 .bio{font-size:.95rem;line-height:1.55}
 .at{color:hsl(217 91% 60%);font-weight:500}
 .pstats{display:flex;flex-wrap:wrap;gap:.4rem 1.25rem;font-size:.9rem;color:hsl(var(--muted-foreground));padding-top:.2rem}
@@ -352,8 +354,11 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px hsl(v
 .end.r{animation-delay:1.8s}
 .end h3{margin:0;font-size:.95rem;font-weight:700;letter-spacing:-.01em;line-height:1.25}
 .end p{margin:0;font-size:.8rem;line-height:1.45;color:hsl(var(--muted-foreground))}
-.end.solid{background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-color:transparent}
-.end.solid p{color:hsl(var(--primary-foreground) / .72)}
+.end.solid{
+  background:radial-gradient(120% 140% at 100% 0%,hsl(258 45% 22%) 0%,transparent 55%),linear-gradient(160deg,hsl(245 28% 13%),hsl(240 22% 8%));
+  color:hsl(0 0% 98%);border-color:hsl(250 40% 60% / .18);
+}
+.end.solid p{color:hsl(0 0% 98% / .72)}
 
 /* nav */
 .nav{
@@ -555,8 +560,7 @@ const STEPS = [
     <p class="soft">This program gets you to either. Or both.</p>`},
 
   {ch:"The path", html:`
-    <p class="kicker">Here's how you get there</p>
-    <h2>Twelve sessions. One path.</h2>
+    <h2>Curriculum</h2>
     <p class="soft">Five live, five pre-recorded, two free bonuses.</p>
     <div class="tablewrap"><table class="grouped">
       <thead><tr><th>Session</th><th>What you take away</th></tr></thead>
@@ -568,14 +572,13 @@ const STEPS = [
     </table></div>`},
 
   {ch:"Every day", html:`
+    <h2>You'll build 100 things during this program.</h2>
     <div class="profile">
       <div class="banner"><video autoplay muted loop playsinline preload="auto" aria-hidden="true"><source src="${BANNER_WEBM}" type="video/webm"><source src="${BANNER}" type="video/mp4"></video></div>
       <div class="pbody">
         <div class="ring"><span class="big">30</span><span class="unit">min</span>
           <span class="tick-badge" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M4 8.4l2.6 2.5L12 5.3"/></svg></span>
         </div>
-        <p class="kicker">Between sessions</p>
-        <h2>Daily missions</h2>
         <p class="bio">One small build every day, with <span class="at">@ClaudeCode</span>, <span class="at">@FigmaMCP</span>, and <span class="at">@Supabase</span>. Small enough you'll actually do it. Big enough to teach something real.</p>
         <div class="pstats">
           <span><b>30 min</b> a day</span>
