@@ -48,6 +48,19 @@
   .tab.active{background:var(--fg);color:var(--bg)}
   .meta{color:var(--muted);font-size:.82rem}
 
+  .stats{display:flex;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap}
+  .stat{
+    flex:1;min-width:170px;border:1px solid var(--border);border-radius:10px;
+    padding:.9rem 1rem;background:var(--card);display:flex;flex-direction:column;gap:.3rem;
+  }
+  .stat-label{font-size:.75rem;color:var(--muted);font-weight:500}
+  .stat-value{display:flex;font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15;height:1.15em;overflow:hidden}
+  .dg{display:inline-block;height:1.15em;overflow:hidden}
+  .dg-col{display:flex;flex-direction:column;transition:transform .7s cubic-bezier(.22,.61,.36,1)}
+  .dg-col span{display:block;height:1.15em}
+  tbody tr.moving{position:relative;z-index:1;background:var(--bg)}
+  @media (prefers-reduced-motion: reduce){.dg-col{transition:none}}
+
   .tablewrap{border:1px solid var(--border);border-radius:8px;overflow:auto}
   table{width:100%;border-collapse:collapse;font-size:.85rem;min-width:820px}
   th,td{text-align:left;padding:.65rem .9rem;white-space:nowrap}
@@ -111,6 +124,16 @@
         <button class="tab" data-cur="USD">USD</button>
       </div>
       <button class="ghost" id="logout">Log out</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-label">Total earned</span>
+      <span class="stat-value" id="stat-earned">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Total promise</span>
+      <span class="stat-value" id="stat-promise">—</span>
     </div>
   </div>
   <p class="meta" id="meta"></p>
@@ -184,7 +207,26 @@ function sortValue(r, key){
   return r[key];
 }
 
+const expanded = new Set();
+const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function setRolling(el, text){
+  el.setAttribute('aria-label', text);
+  const chars = [...text], shape = chars.map(c => /\d/.test(c) ? 'd' : c).join('');
+  if(el.dataset.shape !== shape){
+    el.dataset.shape = shape;
+    el.innerHTML = chars.map(c => /\d/.test(c)
+      ? `<span class="dg" aria-hidden="true"><span class="dg-col">${'0123456789'.split('').map(n => `<span>${n}</span>`).join('')}</span></span>`
+      : `<span class="sep" aria-hidden="true">${c}</span>`).join('');
+    el.offsetHeight;
+  }
+  const cols = el.querySelectorAll('.dg-col');
+  chars.filter(c => /\d/.test(c)).forEach((d, n) => { cols[n].style.transform = `translateY(${-Number(d) * 1.15}em)`; });
+}
+
 function render(){
+  const before = new Map();
+  rowsEl.querySelectorAll('tr[data-id]').forEach(tr => before.set(tr.dataset.id, tr.getBoundingClientRect().top));
   const filtered = rows.filter(r => r.currency === curTab);
   filtered.sort((a, b) => {
     const notFitA = a.status === 'not_fit', notFitB = b.status === 'not_fit';
@@ -196,17 +238,21 @@ function render(){
     th.classList.toggle('active', active);
     th.querySelector('.sort-ico').textContent = active ? (sortDir === 'asc' ? '▲' : '▼') : '';
   });
+  const sym = curTab === 'USD' ? '$' : '₹', locale = curTab === 'USD' ? 'en-US' : 'en-IN';
+  const sumBy = status => filtered.filter(r => r.status === status).reduce((s, r) => s + Number(r.price), 0);
+  setRolling(document.getElementById('stat-earned'), sym + sumBy('paid').toLocaleString(locale));
+  setRolling(document.getElementById('stat-promise'), sym + sumBy('in_funnel').toLocaleString(locale));
   rowsEl.innerHTML = filtered.map(r => `
-    <tr>
+    <tr data-id="${e(r.id)}">
       <td class="price">${r.currency === 'USD' ? '$' : '₹'}${Number(r.price).toLocaleString(r.currency === 'USD' ? 'en-US' : 'en-IN')}</td>
       <td>${e(r.name)}</td>
       <td><a class="mail" href="mailto:${e(r.email)}">${e(r.email)}</a></td>
       <td><a class="wa" href="https://wa.me/${e(String(r.whatsapp).replace(/[^0-9]/g,''))}" target="_blank" rel="noopener">${e(r.whatsapp)}</a></td>
       <td>${relevanceBar(r.relevance)}</td>
-      <td class="wrap-cell">${r.missing ? `<div class="clamp">${e(r.missing)}</div><button class="show-more" type="button">Show more</button>` : '—'}</td>
+      <td class="wrap-cell">${r.missing ? `<div class="clamp${expanded.has(r.id) ? ' expanded' : ''}">${e(r.missing)}</div><button class="show-more" type="button">${expanded.has(r.id) ? 'Show less' : 'Show more'}</button>` : '—'}</td>
       <td>${new Date(r.created_at).toLocaleDateString()}</td>
       <td>
-        <select class="status-chip status-${r.status || 'no_action'}" data-id="${e(r.id)}" data-prev="${r.status || 'no_action'}">
+        <select class="status-chip status-${r.status || 'no_action'}" data-id="${e(r.id)}">
           <option value="no_action"${r.status === 'no_action' || !r.status ? ' selected' : ''}>No action</option>
           <option value="in_funnel"${r.status === 'in_funnel' ? ' selected' : ''}>In funnel</option>
           <option value="paid"${r.status === 'paid' ? ' selected' : ''}>Paid</option>
@@ -218,8 +264,23 @@ function render(){
   emptyEl.hidden = filtered.length !== 0;
   metaEl.textContent = filtered.length + ' submission' + (filtered.length === 1 ? '' : 's') + ' in ' + curTab
     + ' · ' + rows.length + ' total';
-  rowsEl.querySelectorAll('.clamp').forEach(c => {
+  rowsEl.querySelectorAll('.clamp:not(.expanded)').forEach(c => {
     if(c.scrollHeight <= c.clientHeight + 1) c.nextElementSibling.hidden = true;
+  });
+  if(!before.size || reduceMotion()) return;
+  rowsEl.querySelectorAll('tr[data-id]').forEach(tr => {
+    const old = before.get(tr.dataset.id);
+    if(old == null) return;
+    const dy = old - tr.getBoundingClientRect().top;
+    if(Math.abs(dy) < 1) return;
+    tr.classList.add('moving');
+    tr.style.transition = 'none';
+    tr.style.transform = `translateY(${dy}px)`;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      tr.style.transition = 'transform .5s cubic-bezier(.22,.61,.36,1)';
+      tr.style.transform = '';
+      tr.addEventListener('transitionend', () => { tr.classList.remove('moving'); tr.style.transition = ''; }, { once:true });
+    }));
   });
 }
 
@@ -238,28 +299,26 @@ async function updateStatus(id, status){
 rowsEl.addEventListener('click', ev => {
   const btn = ev.target.closest('.show-more');
   if(!btn) return;
-  const clamp = btn.previousElementSibling;
-  const expanded = clamp.classList.toggle('expanded');
-  btn.textContent = expanded ? 'Show less' : 'Show more';
+  const id = btn.closest('tr').dataset.id;
+  const isOpen = btn.previousElementSibling.classList.toggle('expanded');
+  isOpen ? expanded.add(id) : expanded.delete(id);
+  btn.textContent = isOpen ? 'Show less' : 'Show more';
 });
 
 rowsEl.addEventListener('change', async ev => {
   const sel = ev.target.closest('select.status-chip');
   if(!sel) return;
-  const id = sel.dataset.id, status = sel.value, prev = sel.dataset.prev || 'no_action';
-  sel.className = 'status-chip status-' + status;
-  sel.disabled = true;
+  const row = rows.find(r => r.id === sel.dataset.id);
+  if(!row) return;
+  const prev = row.status || 'no_action', status = sel.value;
+  row.status = status;
+  render();
   try{
-    await updateStatus(id, status);
-    const row = rows.find(r => r.id === id);
-    if(row) row.status = status;
-    sel.dataset.prev = status;
+    await updateStatus(row.id, status);
   }catch(err){
-    sel.value = prev;
-    sel.className = 'status-chip status-' + prev;
-    metaEl.textContent = "Couldn't save that change — try again.";
-  }finally{
-    sel.disabled = false;
+    row.status = prev;
+    render();
+    metaEl.textContent = "Couldn't save that change. Check your connection and try again.";
   }
 });
 
