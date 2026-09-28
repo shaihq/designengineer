@@ -40,12 +40,8 @@
   /* app */
   .top{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
   .top h1{font-size:1.2rem;margin:0}
-  .tabs{display:flex;gap:.4rem;background:var(--card);border:1px solid var(--border);padding:.25rem;border-radius:10px}
-  .tab{
-    padding:.45rem 1rem;border-radius:7px;font-size:.85rem;font-weight:600;
-    color:var(--muted);background:transparent;border:none;cursor:pointer;
-  }
-  .tab.active{background:var(--fg);color:var(--bg)}
+  .conv{display:block;font-size:.72rem;font-weight:500;color:var(--muted)}
+  .cur{font-size:.72rem;font-weight:600;padding:.15rem .45rem;border-radius:5px;border:1px solid var(--border);color:var(--muted)}
   .meta{color:var(--muted);font-size:.82rem}
 
   .stats{display:flex;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap}
@@ -96,6 +92,20 @@
   .status-chip.status-not_fit{background-color:hsl(0 72% 55% / .18);color:hsl(0 85% 72%)}
   .empty{padding:3rem 1rem;text-align:center;color:var(--muted)}
   a.mail,a.wa{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted)}
+  .copyable{display:inline-flex;align-items:center;gap:.35rem}
+  .copy{
+    display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;
+    border:none;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;
+  }
+  .copy:hover{background:hsl(0 0% 100% / .08);color:var(--fg)}
+  .copy:focus-visible{outline:2px solid var(--fg);outline-offset:1px}
+  .copy.done{color:hsl(152 65% 62%)}
+  .copy svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+  @media (min-width:900px){
+    .status-cell{position:sticky;right:0;z-index:2;background:var(--bg);box-shadow:inset 1px 0 0 var(--border)}
+    tbody tr:hover .status-cell{background:color-mix(in srgb,var(--bg),#fff 3.5%)}
+  }
 </style>
 </head>
 <body>
@@ -119,10 +129,7 @@
   <div class="top">
     <h1>Course interest</h1>
     <div style="display:flex;align-items:center;gap:.8rem">
-      <div class="tabs">
-        <button class="tab active" data-cur="INR">INR</button>
-        <button class="tab" data-cur="USD">USD</button>
-      </div>
+      <button class="ghost" id="download">Download CSV</button>
       <button class="ghost" id="logout">Log out</button>
     </div>
   </div>
@@ -141,12 +148,12 @@
     <table>
       <thead>
         <tr>
-          <th class="sortable" data-sort="price">Price<span class="sort-ico"></span></th><th>Name</th><th>Email</th><th>WhatsApp</th><th class="sortable" data-sort="relevance">Relevance<span class="sort-ico"></span></th><th>Missing</th><th class="sortable" data-sort="created_at">Submitted<span class="sort-ico"></span></th><th class="sortable" data-sort="status">Status<span class="sort-ico"></span></th>
+          <th class="sortable" data-sort="price">Price<span class="sort-ico"></span></th><th class="sortable" data-sort="currency">Currency<span class="sort-ico"></span></th><th>Name</th><th>Email</th><th>WhatsApp</th><th class="sortable" data-sort="relevance">Relevance<span class="sort-ico"></span></th><th>Missing</th><th class="sortable" data-sort="created_at">Submitted<span class="sort-ico"></span></th><th class="sortable status-cell" data-sort="status">Status<span class="sort-ico"></span></th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
-    <div class="empty" id="empty" hidden>No submissions in this currency yet.</div>
+    <div class="empty" id="empty" hidden>No submissions yet.</div>
   </div>
 </div>
 
@@ -160,7 +167,9 @@ const loginView = document.getElementById('login-view'), appView = document.getE
 const liEmail = document.getElementById('li-email'), liPass = document.getElementById('li-pass'),
       liErr = document.getElementById('li-err'), liSubmit = document.getElementById('li-submit');
 const rowsEl = document.getElementById('rows'), emptyEl = document.getElementById('empty'), metaEl = document.getElementById('meta');
-let session = null, rows = [], curTab = 'INR', sortKey = 'price', sortDir = 'desc';
+const USD_TO_INR = 95;
+let session = null, rows = [], sortKey = 'price', sortDir = 'desc';
+const inr = r => Number(r.price) * (r.currency === 'USD' ? USD_TO_INR : 1);
 
 function getSession(){
   try{ return JSON.parse(sessionStorage.getItem('admin_session') || 'null'); }catch(e){ return null; }
@@ -204,10 +213,36 @@ const STATUS_RANK = { no_action:0, in_funnel:1, paid:2, not_fit:3 };
 function sortValue(r, key){
   if(key === 'created_at') return new Date(r.created_at).getTime();
   if(key === 'status') return STATUS_RANK[r.status] ?? 0;
+  if(key === 'price') return inr(r);
   return r[key];
 }
 
+const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
 const expanded = new Set();
+let visible = [];
+const STATUS_TEXT = { no_action:'No action', in_funnel:'In funnel', paid:'Paid', not_fit:'Not fit' };
+
+function csvCell(v){
+  let s = String(v ?? '');
+  if(/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
+function downloadCsv(){
+  const head = ['Name','Email','WhatsApp','Currency','Price','Relevance','Status','Missing','Submitted'];
+  const lines = visible.map(r => [
+    r.name, r.email, r.whatsapp, r.currency, r.price, r.relevance,
+    STATUS_TEXT[r.status] || 'No action', r.missing, r.created_at
+  ].map(csvCell).join(','));
+  const csv = '﻿' + [head.map(csvCell).join(','), ...lines].join('\r\n');
+  const url = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'course-interest-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function setRolling(el, text){
@@ -227,31 +262,33 @@ function setRolling(el, text){
 function render(){
   const before = new Map();
   rowsEl.querySelectorAll('tr[data-id]').forEach(tr => before.set(tr.dataset.id, tr.getBoundingClientRect().top));
-  const filtered = rows.filter(r => r.currency === curTab);
+  const filtered = visible = rows.slice();
   filtered.sort((a, b) => {
     const notFitA = a.status === 'not_fit', notFitB = b.status === 'not_fit';
     if(notFitA !== notFitB) return notFitA ? 1 : -1;
-    return (sortValue(a, sortKey) - sortValue(b, sortKey)) * (sortDir === 'asc' ? 1 : -1);
+    const va = sortValue(a, sortKey), vb = sortValue(b, sortKey), dir = sortDir === 'asc' ? 1 : -1;
+    if(typeof va === 'string') return va.localeCompare(vb) * dir || inr(b) - inr(a);
+    return (va - vb) * dir;
   });
   document.querySelectorAll('th.sortable').forEach(th => {
     const active = th.dataset.sort === sortKey;
     th.classList.toggle('active', active);
     th.querySelector('.sort-ico').textContent = active ? (sortDir === 'asc' ? '▲' : '▼') : '';
   });
-  const sym = curTab === 'USD' ? '$' : '₹', locale = curTab === 'USD' ? 'en-US' : 'en-IN';
-  const sumBy = status => filtered.filter(r => r.status === status).reduce((s, r) => s + Number(r.price), 0);
-  setRolling(document.getElementById('stat-earned'), sym + sumBy('paid').toLocaleString(locale));
-  setRolling(document.getElementById('stat-promise'), sym + sumBy('in_funnel').toLocaleString(locale));
+  const sumBy = status => Math.round(filtered.filter(r => r.status === status).reduce((s, r) => s + inr(r), 0));
+  setRolling(document.getElementById('stat-earned'), '₹' + sumBy('paid').toLocaleString('en-IN'));
+  setRolling(document.getElementById('stat-promise'), '₹' + sumBy('in_funnel').toLocaleString('en-IN'));
   rowsEl.innerHTML = filtered.map(r => `
     <tr data-id="${e(r.id)}">
-      <td class="price">${r.currency === 'USD' ? '$' : '₹'}${Number(r.price).toLocaleString(r.currency === 'USD' ? 'en-US' : 'en-IN')}</td>
+      <td class="price">${r.currency === 'USD' ? '$' + Number(r.price).toLocaleString('en-US') + `<span class="conv">≈ ₹${Math.round(inr(r)).toLocaleString('en-IN')}</span>` : '₹' + Number(r.price).toLocaleString('en-IN')}</td>
+      <td><span class="cur">${e(r.currency)}</span></td>
       <td>${e(r.name)}</td>
-      <td><a class="mail" href="mailto:${e(r.email)}">${e(r.email)}</a></td>
-      <td><a class="wa" href="https://wa.me/${e(String(r.whatsapp).replace(/[^0-9]/g,''))}" target="_blank" rel="noopener">${e(r.whatsapp)}</a></td>
+      <td><span class="copyable"><a class="mail" href="mailto:${e(r.email)}">${e(r.email)}</a><button class="copy" type="button" data-copy="${e(r.email)}" aria-label="Copy email" title="Copy email">${COPY_ICON}</button></span></td>
+      <td><span class="copyable"><a class="wa" href="https://wa.me/${e(String(r.whatsapp).replace(/[^0-9]/g,''))}" target="_blank" rel="noopener">${e(r.whatsapp)}</a><button class="copy" type="button" data-copy="${e(r.whatsapp)}" aria-label="Copy WhatsApp number" title="Copy number">${COPY_ICON}</button></span></td>
       <td>${relevanceBar(r.relevance)}</td>
       <td class="wrap-cell">${r.missing ? `<div class="clamp${expanded.has(r.id) ? ' expanded' : ''}">${e(r.missing)}</div><button class="show-more" type="button">${expanded.has(r.id) ? 'Show less' : 'Show more'}</button>` : '—'}</td>
       <td>${new Date(r.created_at).toLocaleDateString()}</td>
-      <td>
+      <td class="status-cell">
         <select class="status-chip status-${r.status || 'no_action'}" data-id="${e(r.id)}">
           <option value="no_action"${r.status === 'no_action' || !r.status ? ' selected' : ''}>No action</option>
           <option value="in_funnel"${r.status === 'in_funnel' ? ' selected' : ''}>In funnel</option>
@@ -262,8 +299,9 @@ function render(){
     </tr>
   `).join('');
   emptyEl.hidden = filtered.length !== 0;
-  metaEl.textContent = filtered.length + ' submission' + (filtered.length === 1 ? '' : 's') + ' in ' + curTab
-    + ' · ' + rows.length + ' total';
+  const usdCount = filtered.filter(r => r.currency === 'USD').length;
+  metaEl.textContent = filtered.length + ' submission' + (filtered.length === 1 ? '' : 's')
+    + ' · ' + (filtered.length - usdCount) + ' INR, ' + usdCount + ' USD · totals use $1 = ₹' + USD_TO_INR;
   rowsEl.querySelectorAll('.clamp:not(.expanded)').forEach(c => {
     if(c.scrollHeight <= c.clientHeight + 1) c.nextElementSibling.hidden = true;
   });
@@ -296,7 +334,28 @@ async function updateStatus(id, status){
   if(!res.ok) throw new Error('save_failed');
 }
 
-rowsEl.addEventListener('click', ev => {
+async function copyText(text){
+  try{
+    await navigator.clipboard.writeText(text);
+  }catch(err){
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+}
+
+rowsEl.addEventListener('click', async ev => {
+  const copyBtn = ev.target.closest('.copy');
+  if(copyBtn){
+    await copyText(copyBtn.dataset.copy);
+    copyBtn.innerHTML = CHECK_ICON;
+    copyBtn.classList.add('done');
+    clearTimeout(copyBtn._t);
+    copyBtn._t = setTimeout(() => { copyBtn.innerHTML = COPY_ICON; copyBtn.classList.remove('done'); }, 1200);
+    return;
+  }
   const btn = ev.target.closest('.show-more');
   if(!btn) return;
   const id = btn.closest('tr').dataset.id;
@@ -340,16 +399,8 @@ function showLogin(msg){
   liEmail.focus();
 }
 
-document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    curTab = btn.dataset.cur;
-    render();
-  });
-});
-
 document.getElementById('logout').addEventListener('click', () => { clearSession(); showLogin(); });
+document.getElementById('download').addEventListener('click', downloadCsv);
 
 document.querySelectorAll('th.sortable').forEach(th => {
   th.addEventListener('click', () => {
