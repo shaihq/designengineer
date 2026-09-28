@@ -725,7 +725,7 @@ enForm.addEventListener('submit', async ev => {
 
   btn.disabled = true; btn.textContent = 'Sending…';
   try{
-    await insertRow(SUPABASE_TABLE, { name, email, whatsapp:wa, relevance, currency:cur, price:Number(price), missing:missing || null });
+    await insertRow(SUPABASE_TABLE, { name, email, whatsapp:wa, relevance, currency:cur, price:Number(price), missing:missing || null, source:'roast' });
     showThanks();
   }catch(err){
     btn.disabled = false; btn.textContent = 'Send my enrollment';

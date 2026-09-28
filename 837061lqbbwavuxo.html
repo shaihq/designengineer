@@ -42,6 +42,8 @@
   .top h1{font-size:1.2rem;margin:0}
   .conv{display:block;font-size:.72rem;font-weight:500;color:var(--muted)}
   .cur{font-size:.72rem;font-weight:600;padding:.15rem .45rem;border-radius:5px;border:1px solid var(--border);color:var(--muted)}
+  .src{font-size:.72rem;font-weight:600;padding:.15rem .45rem;border-radius:5px;border:1px solid var(--border);color:var(--muted)}
+  .src.roast{border-color:hsl(4 80% 60% / .45);color:hsl(4 90% 70%);background:hsl(4 80% 55% / .1)}
   .meta{color:var(--muted);font-size:.82rem}
 
   .stats{display:flex;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap}
@@ -148,7 +150,7 @@
     <table>
       <thead>
         <tr>
-          <th class="sortable" data-sort="price">Price<span class="sort-ico"></span></th><th class="sortable" data-sort="currency">Currency<span class="sort-ico"></span></th><th>Name</th><th>Email</th><th>WhatsApp</th><th class="sortable" data-sort="relevance">Relevance<span class="sort-ico"></span></th><th>Missing</th><th class="sortable" data-sort="created_at">Submitted<span class="sort-ico"></span></th><th class="sortable status-cell" data-sort="status">Status<span class="sort-ico"></span></th>
+          <th class="sortable" data-sort="price">Price<span class="sort-ico"></span></th><th class="sortable" data-sort="currency">Currency<span class="sort-ico"></span></th><th>Name</th><th>Email</th><th>WhatsApp</th><th class="sortable" data-sort="relevance">Relevance<span class="sort-ico"></span></th><th>Missing</th><th class="sortable" data-sort="created_at">Submitted<span class="sort-ico"></span></th><th class="sortable" data-sort="source">Source<span class="sort-ico"></span></th><th class="sortable status-cell" data-sort="status">Status<span class="sort-ico"></span></th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -230,10 +232,10 @@ function csvCell(v){
 }
 
 function downloadCsv(){
-  const head = ['Name','Email','WhatsApp','Currency','Price','Relevance','Status','Missing','Submitted'];
+  const head = ['Name','Email','WhatsApp','Currency','Price','Relevance','Status','Source','Missing','Submitted'];
   const lines = visible.map(r => [
     r.name, r.email, r.whatsapp, r.currency, r.price, r.relevance,
-    STATUS_TEXT[r.status] || 'No action', r.missing, r.created_at
+    STATUS_TEXT[r.status] || 'No action', r.source === 'roast' ? 'Roast page' : 'Main page', r.missing, r.created_at
   ].map(csvCell).join(','));
   const csv = '﻿' + [head.map(csvCell).join(','), ...lines].join('\r\n');
   const url = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
@@ -288,6 +290,7 @@ function render(){
       <td>${relevanceBar(r.relevance)}</td>
       <td class="wrap-cell">${r.missing ? `<div class="clamp${expanded.has(r.id) ? ' expanded' : ''}">${e(r.missing)}</div><button class="show-more" type="button">${expanded.has(r.id) ? 'Show less' : 'Show more'}</button>` : '—'}</td>
       <td>${new Date(r.created_at).toLocaleDateString()}</td>
+      <td><span class="src${r.source === 'roast' ? ' roast' : ''}">${r.source === 'roast' ? 'Roast page' : 'Main page'}</span></td>
       <td class="status-cell">
         <select class="status-chip status-${r.status || 'no_action'}" data-id="${e(r.id)}">
           <option value="no_action"${r.status === 'no_action' || !r.status ? ' selected' : ''}>No action</option>
