@@ -90,6 +90,7 @@
   }
   .status-chip:focus-visible{outline:2px solid var(--fg);outline-offset:1px}
   .status-chip.status-no_action{background-color:hsl(0 0% 100% / .08);color:var(--muted)}
+  .status-chip.status-followed_up{background-color:hsl(210 85% 58% / .18);color:hsl(210 90% 72%)}
   .status-chip.status-in_funnel{background-color:hsl(32 90% 55% / .18);color:hsl(32 95% 68%)}
   .status-wrap{display:flex;align-items:center;gap:.4rem}
   .paid-in{
@@ -230,7 +231,7 @@ function relevanceBar(n){
   return `<span class="rel"><span class="rel-bar"><span style="width:${pct}%"></span></span>${e(n)}/10</span>`;
 }
 
-const STATUS_RANK = { no_action:0, in_funnel:1, paid:2, not_fit:3 };
+const STATUS_RANK = { no_action:0, followed_up:1, in_funnel:2, paid:3, not_fit:4 };
 function sortValue(r, key){
   if(key === 'created_at') return new Date(r.created_at).getTime();
   if(key === 'status') return STATUS_RANK[r.status] ?? 0;
@@ -242,7 +243,7 @@ const COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9"
 const CHECK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
 const expanded = new Set();
 let visible = [];
-const STATUS_TEXT = { no_action:'No action', in_funnel:'In funnel', paid:'Paid', not_fit:'Not fit' };
+const STATUS_TEXT = { no_action:'No action', followed_up:'Followed up', in_funnel:'In funnel', paid:'Paid', not_fit:'Not fit' };
 
 function csvCell(v){
   let s = String(v ?? '');
@@ -311,6 +312,7 @@ function render(){
       <td class="status-cell"><div class="status-wrap">
         <select class="status-chip status-${r.status || 'no_action'}" data-id="${e(r.id)}">
           <option value="no_action"${r.status === 'no_action' || !r.status ? ' selected' : ''}>No action</option>
+          <option value="followed_up"${r.status === 'followed_up' ? ' selected' : ''}>Followed up</option>
           <option value="in_funnel"${r.status === 'in_funnel' ? ' selected' : ''}>In funnel</option>
           <option value="paid"${r.status === 'paid' ? ' selected' : ''}>Paid</option>
           <option value="not_fit"${r.status === 'not_fit' ? ' selected' : ''}>Not fit</option>
