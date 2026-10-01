@@ -215,7 +215,7 @@
       <div><label for="a-rel">Relevance (1–10)</label><input id="a-rel" type="number" min="1" max="10" step="1"></div>
       <div><label for="a-src">Source</label><select id="a-src"><option value="main">main</option><option value="roast">roast</option></select></div>
       <div><label for="a-status">Status</label><select id="a-status"></select></div>
-      <div id="a-paid-wrap" hidden><label for="a-paid">Paid amount</label><input id="a-paid" inputmode="numeric" placeholder="Same as price" autocomplete="off"></div>
+      <div id="a-paid-wrap" hidden><label for="a-paid">Paid amount (₹)</label><input id="a-paid" inputmode="numeric" placeholder="Amount" autocomplete="off"></div>
       <div><label for="a-date">Submitted</label><input id="a-date" type="date"></div>
       <div class="full"><label for="a-miss">Missing</label><textarea id="a-miss" rows="3"></textarea></div>
     </div>
@@ -241,7 +241,6 @@ const USD_TO_INR = 95;
 let session = null, rows = [], sortKey = 'price', sortDir = 'desc';
 const toInr = (amount, currency) => Number(amount) * (currency === 'USD' ? USD_TO_INR : 1);
 const inr = r => toInr(r.price, r.currency);
-const paidValue = r => r.paid_amount != null ? Number(r.paid_amount) : Number(r.price);
 const fmtCur = (n, c) => Number(n).toLocaleString(c === 'USD' ? 'en-US' : 'en-IN');
 
 function getSession(){
@@ -303,7 +302,7 @@ function csvCell(v){
 }
 
 function downloadCsv(){
-  const head = ['Name','Email','WhatsApp','Currency','Price','Relevance','Status','Paid amount','Source','Missing','Submitted'];
+  const head = ['Name','Email','WhatsApp','Currency','Price','Relevance','Status','Paid amount (INR)','Source','Missing','Submitted'];
   const lines = visible.map(r => [
     r.name, r.email, r.whatsapp, r.currency, r.price, r.relevance,
     STATUS_TEXT[r.status] || 'No action', r.paid_amount ?? '', r.source === 'roast' ? 'roast' : 'main', r.missing, r.created_at
@@ -368,7 +367,7 @@ function render(){
           <option value="paid"${r.status === 'paid' ? ' selected' : ''}>Paid</option>
           <option value="not_fit"${r.status === 'not_fit' ? ' selected' : ''}>Not fit</option>
         </select>
-        ${r.status === 'paid' ? `<label class="paid-in" title="Amount paid"><span>${r.currency === 'USD' ? '$' : '₹'}</span><input class="paid-amt" type="text" inputmode="numeric" data-id="${e(r.id)}" value="${r.paid_amount != null ? fmtCur(r.paid_amount, r.currency) : ''}" placeholder="${fmtCur(r.price, r.currency)}" aria-label="Amount ${e(r.name)} paid"></label>` : ''}
+        ${r.status === 'paid' ? `<label class="paid-in" title="Amount paid"><span>₹</span><input class="paid-amt" type="text" inputmode="numeric" data-id="${e(r.id)}" value="${r.paid_amount != null ? fmtCur(r.paid_amount, 'INR') : ''}" placeholder="Amount" aria-label="Amount ${e(r.name)} paid"></label>` : ''}
       </div></td>
     </tr>
   `).join('');
@@ -397,7 +396,7 @@ function render(){
 }
 
 function renderStats(){
-  const earned = rows.filter(r => r.status === 'paid').reduce((s, r) => s + toInr(paidValue(r), r.currency), 0);
+  const earned = rows.filter(r => r.status === 'paid').reduce((s, r) => s + Number(r.paid_amount ?? 0), 0);
   const prices = rows.filter(r => r.status !== 'not_fit').map(inr).sort((a, b) => a - b);
   const mid = Math.floor(prices.length / 2);
   const median = !prices.length ? 0 : prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2;
@@ -455,14 +454,14 @@ addForm.addEventListener('input', ev => {
   const t = ev.target;
   if(t === af('price') || t === af('paid')){
     const d = digitsOf(t.value);
-    t.value = d ? fmtCur(d, af('cur').value) : '';
+    t.value = d ? fmtCur(d, t === af('paid') ? 'INR' : af('cur').value) : '';
   }
   if(t === af('wa')) t.value = t.value.replace(/[^0-9+ ]/g, '');
   addErr.textContent = '';
 });
 addForm.addEventListener('change', ev => {
   if(ev.target === af('status')) af('paid-wrap').hidden = af('status').value !== 'paid';
-  if(ev.target === af('cur')) ['price', 'paid'].forEach(k => { const d = digitsOf(af(k).value); af(k).value = d ? fmtCur(d, af('cur').value) : ''; });
+  if(ev.target === af('cur')) { const d = digitsOf(af('price').value); af('price').value = d ? fmtCur(d, af('cur').value) : ''; }
 });
 addDlg.addEventListener('click', ev => {
   if(ev.target === addDlg || ev.target.closest('[data-close]')) addDlg.close();
@@ -534,7 +533,7 @@ rowsEl.addEventListener('input', ev => {
   if(!inp) return;
   const row = rows.find(r => r.id === inp.dataset.id);
   const d = inp.value.replace(/[^0-9]/g, '').slice(0, 8);
-  inp.value = d ? fmtCur(d, row.currency) : '';
+  inp.value = d ? fmtCur(d, 'INR') : '';
   row.paid_amount = d ? Number(d) : null;
   inp.parentElement.classList.remove('saved', 'failed');
   renderStats();
@@ -556,7 +555,7 @@ async function savePaid(inp){
     setTimeout(() => wrap.classList.remove('saved'), 1400);
   }catch(err){
     row.paid_amount = row._savedPaid ?? null;
-    inp.value = row.paid_amount != null ? fmtCur(row.paid_amount, row.currency) : '';
+    inp.value = row.paid_amount != null ? fmtCur(row.paid_amount, 'INR') : '';
     wrap.classList.add('failed');
     renderStats();
     metaEl.textContent = "Couldn't save the paid amount. Check your connection and try again.";
