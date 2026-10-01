@@ -120,6 +120,29 @@
   .copy.done{color:hsl(152 65% 62%)}
   .copy svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
+  .dlg{
+    width:min(560px,calc(100vw - 2rem));max-height:calc(100vh - 2rem);padding:0;border:1px solid var(--border);
+    border-radius:12px;background:var(--card);color:var(--fg);
+  }
+  .dlg::backdrop{background:rgb(0 0 0 / .6)}
+  .dlg form{padding:1.25rem;display:flex;flex-direction:column;gap:1rem}
+  .dlg-head{display:flex;align-items:center;justify-content:space-between}
+  .dlg-head h2{font-size:1rem;margin:0}
+  .dlg-x{background:transparent;color:var(--muted);border:none;padding:.2rem .5rem;font-size:1.2rem;line-height:1}
+  .dlg-x:hover{color:var(--fg)}
+  .dlg-grid{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+  .dlg-grid .full{grid-column:1 / -1}
+  .dlg select,.dlg textarea{
+    width:100%;padding:.6rem .7rem;border-radius:8px;border:1px solid var(--border);
+    background:#0f1014;color:var(--fg);font:inherit;font-size:.9rem;
+  }
+  .dlg textarea{resize:vertical}
+  .dlg select:focus,.dlg textarea:focus{outline:none;border-color:#565b66}
+  .dlg input[type=date]{color-scheme:dark}
+  .dlg .req{color:var(--danger)}
+  .dlg-foot{display:flex;justify-content:flex-end;gap:.6rem}
+  @media (max-width:520px){.dlg-grid{grid-template-columns:1fr}}
+
   @media (min-width:900px){
     .status-cell{position:sticky;right:0;z-index:2;background:var(--bg);box-shadow:inset 1px 0 0 var(--border)}
     tbody tr:hover .status-cell{background:color-mix(in srgb,var(--bg),#fff 3.5%)}
@@ -147,6 +170,7 @@
   <div class="top">
     <h1>Course interest</h1>
     <div style="display:flex;align-items:center;gap:.8rem">
+      <button class="ghost" id="add-open">Add manually</button>
       <button class="ghost" id="download">Download CSV</button>
       <button class="ghost" id="logout">Log out</button>
     </div>
@@ -175,6 +199,33 @@
     <div class="empty" id="empty" hidden>No submissions yet.</div>
   </div>
 </div>
+
+<dialog id="add-dlg" class="dlg" aria-labelledby="add-title">
+  <form id="add-form" novalidate>
+    <div class="dlg-head">
+      <h2 id="add-title">Add entry</h2>
+      <button type="button" class="dlg-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="dlg-grid">
+      <div class="full"><label for="a-name">Name <span class="req">*</span></label><input id="a-name" autocomplete="off"></div>
+      <div><label for="a-email">Email</label><input id="a-email" type="email" autocomplete="off"></div>
+      <div><label for="a-wa">WhatsApp</label><input id="a-wa" inputmode="tel" placeholder="+91 98765 43210" autocomplete="off"></div>
+      <div><label for="a-cur">Currency</label><select id="a-cur"><option value="INR">INR</option><option value="USD">USD</option></select></div>
+      <div><label for="a-price">Price <span class="req">*</span></label><input id="a-price" inputmode="numeric" autocomplete="off"></div>
+      <div><label for="a-rel">Relevance (1–10)</label><input id="a-rel" type="number" min="1" max="10" step="1"></div>
+      <div><label for="a-src">Source</label><select id="a-src"><option value="main">main</option><option value="roast">roast</option></select></div>
+      <div><label for="a-status">Status</label><select id="a-status"></select></div>
+      <div id="a-paid-wrap" hidden><label for="a-paid">Paid amount</label><input id="a-paid" inputmode="numeric" placeholder="Same as price" autocomplete="off"></div>
+      <div><label for="a-date">Submitted</label><input id="a-date" type="date"></div>
+      <div class="full"><label for="a-miss">Missing</label><textarea id="a-miss" rows="3"></textarea></div>
+    </div>
+    <span class="err" id="a-err"></span>
+    <div class="dlg-foot">
+      <button type="button" class="ghost" data-close>Cancel</button>
+      <button type="submit" id="a-submit">Add entry</button>
+    </div>
+  </form>
+</dialog>
 
 <script>
 const SUPABASE_URL = "https://hfgqtwkfxhzuwbqrxxru.supabase.co";
@@ -304,9 +355,9 @@ function render(){
       <td><span class="cur">${e(r.currency)}</span></td>
       <td>${e(r.name)}</td>
       <td><span class="src${r.source === 'roast' ? ' roast' : ''}">${r.source === 'roast' ? 'roast' : 'main'}</span></td>
-      <td><span class="copyable"><a class="mail" href="mailto:${e(r.email)}">${e(r.email)}</a><button class="copy" type="button" data-copy="${e(r.email)}" aria-label="Copy email" title="Copy email">${COPY_ICON}</button></span></td>
-      <td><span class="copyable"><a class="wa" href="https://wa.me/${e(String(r.whatsapp).replace(/[^0-9]/g,''))}" target="_blank" rel="noopener">${e(r.whatsapp)}</a><button class="copy" type="button" data-copy="${e(r.whatsapp)}" aria-label="Copy WhatsApp number" title="Copy number">${COPY_ICON}</button></span></td>
-      <td>${relevanceBar(r.relevance)}</td>
+      <td>${r.email ? `<span class="copyable"><a class="mail" href="mailto:${e(r.email)}">${e(r.email)}</a><button class="copy" type="button" data-copy="${e(r.email)}" aria-label="Copy email" title="Copy email">${COPY_ICON}</button></span>` : '—'}</td>
+      <td>${r.whatsapp ? `<span class="copyable"><a class="wa" href="https://wa.me/${e(String(r.whatsapp).replace(/[^0-9]/g,''))}" target="_blank" rel="noopener">${e(r.whatsapp)}</a><button class="copy" type="button" data-copy="${e(r.whatsapp)}" aria-label="Copy WhatsApp number" title="Copy number">${COPY_ICON}</button></span>` : '—'}</td>
+      <td>${r.relevance != null ? relevanceBar(r.relevance) : '—'}</td>
       <td class="wrap-cell">${r.missing ? `<div class="clamp${expanded.has(r.id) ? ' expanded' : ''}">${e(r.missing)}</div><button class="show-more" type="button">${expanded.has(r.id) ? 'Show less' : 'Show more'}</button>` : '—'}</td>
       <td>${new Date(r.created_at).toLocaleDateString()}</td>
       <td class="status-cell"><div class="status-wrap">
@@ -369,6 +420,84 @@ async function updateRow(id, fields){
   });
   if(!res.ok) throw new Error('save_failed');
 }
+
+async function insertRow(fields){
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + SUPABASE_TABLE, {
+    method:'POST',
+    headers:{
+      apikey:SUPABASE_ANON_KEY, Authorization:'Bearer ' + session.access_token,
+      'Content-Type':'application/json', Prefer:'return=representation'
+    },
+    body:JSON.stringify(fields)
+  });
+  const data = await res.json().catch(() => null);
+  if(!res.ok) throw new Error((data && data.message) || 'Could not save (' + res.status + ')');
+  return data[0];
+}
+
+const addDlg = document.getElementById('add-dlg'), addForm = document.getElementById('add-form'),
+      addErr = document.getElementById('a-err'), addSubmit = document.getElementById('a-submit');
+const af = id => document.getElementById('a-' + id);
+const digitsOf = s => s.replace(/[^0-9]/g, '').slice(0, 8);
+const localDate = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+af('status').innerHTML = Object.entries(STATUS_TEXT).map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+
+function openAdd(){
+  addForm.reset();
+  addErr.textContent = '';
+  af('paid-wrap').hidden = true;
+  af('date').value = localDate(new Date());
+  addDlg.showModal();
+  af('name').focus();
+}
+
+addForm.addEventListener('input', ev => {
+  const t = ev.target;
+  if(t === af('price') || t === af('paid')){
+    const d = digitsOf(t.value);
+    t.value = d ? fmtCur(d, af('cur').value) : '';
+  }
+  if(t === af('wa')) t.value = t.value.replace(/[^0-9+ ]/g, '');
+  addErr.textContent = '';
+});
+addForm.addEventListener('change', ev => {
+  if(ev.target === af('status')) af('paid-wrap').hidden = af('status').value !== 'paid';
+  if(ev.target === af('cur')) ['price', 'paid'].forEach(k => { const d = digitsOf(af(k).value); af(k).value = d ? fmtCur(d, af('cur').value) : ''; });
+});
+addDlg.addEventListener('click', ev => {
+  if(ev.target === addDlg || ev.target.closest('[data-close]')) addDlg.close();
+});
+
+addForm.addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const name = af('name').value.trim(), email = af('email').value.trim(), wa = af('wa').value.trim(),
+        currency = af('cur').value, price = digitsOf(af('price').value), rel = af('rel').value,
+        status = af('status').value, paid = digitsOf(af('paid').value), missing = af('miss').value.trim(), date = af('date').value;
+  const fail = (msg, el) => { addErr.textContent = msg; el.focus(); };
+  if(!name) return fail('Enter a name', af('name'));
+  if(!email && !wa) return fail('Enter an email or a WhatsApp number', af('email'));
+  if(!price || Number(price) <= 0) return fail('Enter a price', af('price'));
+  if(rel && !(Number.isInteger(Number(rel)) && rel >= 1 && rel <= 10)) return fail('Relevance must be a whole number from 1 to 10', af('rel'));
+  const fields = {
+    name, email:email || null, whatsapp:wa || null, currency, price:Number(price),
+    relevance:rel ? Number(rel) : null, missing:missing || null, status
+  };
+  if(af('src').value === 'roast') fields.source = 'roast';
+  if(status === 'paid' && paid) fields.paid_amount = Number(paid);
+  if(date && date !== localDate(new Date())) fields.created_at = new Date(date + 'T12:00').toISOString();
+  addSubmit.disabled = true; addSubmit.textContent = 'Adding…';
+  try{
+    const row = await insertRow(fields);
+    row._savedPaid = row.paid_amount ?? null;
+    rows.push(row);
+    render();
+    addDlg.close();
+  }catch(err){
+    addErr.textContent = err.message;
+  }finally{
+    addSubmit.disabled = false; addSubmit.textContent = 'Add entry';
+  }
+});
 
 async function copyText(text){
   try{
@@ -478,6 +607,7 @@ function showLogin(msg){
 
 document.getElementById('logout').addEventListener('click', () => { clearSession(); showLogin(); });
 document.getElementById('download').addEventListener('click', downloadCsv);
+document.getElementById('add-open').addEventListener('click', openAdd);
 
 document.querySelectorAll('th.sortable').forEach(th => {
   th.addEventListener('click', () => {
